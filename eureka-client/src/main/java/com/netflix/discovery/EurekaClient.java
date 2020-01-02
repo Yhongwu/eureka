@@ -26,7 +26,7 @@ import com.netflix.discovery.shared.LookupService;
  *
  * @author David Liu
  */
-@ImplementedBy(DiscoveryClient.class)
+@ImplementedBy(DiscoveryClient.class) //默认实现
 public interface EurekaClient extends LookupService {
 
     // ========================
@@ -160,6 +160,8 @@ public interface EurekaClient extends LookupService {
      * by {@link EurekaClientConfig#getInstanceInfoReplicationIntervalSeconds()}.
      *
      * @param healthCheckHandler app specific healthcheck handler.
+     *
+     *
      */
     public void registerHealthCheck(HealthCheckHandler healthCheckHandler);
 
@@ -172,7 +174,9 @@ public interface EurekaClient extends LookupService {
      * 
      * {@link EurekaEventListener#onEvent} is called from the context of an internal thread 
      * and must therefore return as quickly as possible without blocking.
-     * 
+     *
+     * 为 Eureka Client 注册健康检查处理器
+     * 监听 Client服务实例信息的更新
      * @param eventListener
      */
     public void registerEventListener(EurekaEventListener eventListener);

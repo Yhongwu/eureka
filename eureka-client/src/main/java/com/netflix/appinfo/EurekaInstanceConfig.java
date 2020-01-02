@@ -38,6 +38,10 @@ import com.google.inject.ImplementedBy;
  *
  * @author Karthik Ranganathan
  *
+ * 封装 Eureka Client 自身服务实例的配置信息,主要用于构建 lnstancelnfo 通常
+ * 这些信息在配置文件中的 eureka.instance前缀下进行设置，Spring Cloud 通过
+ * EurekaInstanceConfigBean 配置类提供了默认配置
+ *
  */
 @ImplementedBy(CloudInstanceConfig.class)
 public interface EurekaInstanceConfig {

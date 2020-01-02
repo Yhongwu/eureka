@@ -47,7 +47,9 @@ import com.netflix.discovery.shared.transport.EurekaTransportConfig;
  * Note that all configurations are not effective at runtime unless and
  * otherwise specified.
  * </p>
- *
+ * 封装 Eureka Client 与 Eureka Server 交互所需要的配置信息。Spring Cloud 为其提
+ * 供了一个默认配置类的 EurekaClientConfigBean,可以在配置文件中通过前缀 eureka.client
+ * 属性名进行属性覆盖
  * @author Karthik Ranganathan
  *
  */

@@ -58,7 +58,7 @@ import com.thoughtworks.xstream.annotations.XStreamImplicit;
  * </p>
  *
  * @author Karthik Ranganathan
- *
+ * 注册表中所有服务实例信息的集合
  */
 @Serializer("com.netflix.discovery.converters.EntityBodyConverter")
 @XStreamAlias("applications")

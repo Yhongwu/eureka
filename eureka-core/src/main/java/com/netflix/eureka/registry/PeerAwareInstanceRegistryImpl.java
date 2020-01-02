@@ -87,6 +87,8 @@ import javax.inject.Singleton;
  *
  * @author Karthik Ranganathan, Greg Kim
  *
+ * 继承了AbstractInstanceRegistry 提供了集群同步相关的实现
+ *
  */
 @Singleton
 public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry implements PeerAwareInstanceRegistry {
@@ -201,26 +203,33 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
      * Populates the registry information from a peer eureka node. This
      * operation fails over to other nodes until the list is exhausted if the
      * communication fails.
+     * 从peer节点拉取注册表信息同步到本地节点
      */
     @Override
     public int syncUp() {
         // Copy entire entry from neighboring DS node
+        // 从临近的 peer 中复制整个注册表 ？
         int count = 0;
 
         for (int i = 0; ((i < serverConfig.getRegistrySyncRetries()) && (count == 0)); i++) {
             if (i > 0) {
                 try {
+                    // 获取不到 线程等待
                     Thread.sleep(serverConfig.getRegistrySyncRetryWaitMs());
                 } catch (InterruptedException e) {
                     logger.warn("Interrupted during registry transfer..");
                     break;
                 }
             }
+            // 获取所有的服务实例
             Applications apps = eurekaClient.getApplications();
             for (Application app : apps.getRegisteredApplications()) {
                 for (InstanceInfo instance : app.getInstances()) {
                     try {
+                        // 判断是否可注册，主要用于AWS环境下进行，若部署在其他的环境，直接返回 true
+                        // 跟AWS环境的代码基本可以暂时忽略
                         if (isRegisterable(instance)) {
+                            // 注册到本地注册表
                             register(instance, instance.getLeaseInfo().getDurationInSecs(), true);
                             count++;
                         }
@@ -236,22 +245,28 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
     @Override
     public void openForTraffic(ApplicationInfoManager applicationInfoManager, int count) {
         // Renewals happen every 30 seconds and for a minute it should be a factor of 2.
+        // 初始化自我保护机制统计参数
         this.expectedNumberOfRenewsPerMin = count * 2;
         this.numberOfRenewsPerMinThreshold =
                 (int) (this.expectedNumberOfRenewsPerMin * serverConfig.getRenewalPercentThreshold());
         logger.info("Got {} instances from neighboring DS node", count);
         logger.info("Renew threshold is: {}", numberOfRenewsPerMinThreshold);
         this.startupTime = System.currentTimeMillis();
+        // 如果同步的应用实例数量为 0 ，将在一段时间内拒绝Client获取注册信息
         if (count > 0) {
+            // 在WaitTimelnMsWhenSyncEmpty时间后才能被 Eureka Client 访问获取注册表信息
+            // springcloud 可以通过eureka.server.wait-time-in-ms-when-sync-empty设置，默认是5分钟
             this.peerInstancesTransferEmptyOnStartup = false;
         }
         DataCenterInfo.Name selfName = applicationInfoManager.getInfo().getDataCenterInfo().getName();
         boolean isAws = Name.Amazon == selfName;
+        // 与AWs相关代码 可以先忽略
         if (isAws && serverConfig.shouldPrimeAwsReplicaConnections()) {
             logger.info("Priming AWS connections for all replicas..");
             primeAwsReplicas(applicationInfoManager);
         }
         logger.info("Changing status to UP");
+        // 修改服务实例的状态为上线,开始接受流量
         applicationInfoManager.setInstanceStatus(InstanceStatus.UP);
         super.postInit();
     }
@@ -376,6 +391,7 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
     public boolean cancel(final String appName, final String id,
                           final boolean isReplication) {
         if (super.cancel(appName, id, isReplication)) {
+            // 同步注册信息到其它peer节点 在PeerAwareInstanceRegistryImpl的注册、续约、下线都会有这步操作
             replicateToPeers(Action.Cancel, appName, id, null, null, isReplication);
             synchronized (lock) {
                 if (this.expectedNumberOfRenewsPerMin > 0) {
@@ -624,15 +640,18 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
                 numberOfReplicationsLastMin.increment();
             }
             // If it is a replication already, do not replicate again as this will create a poison replication
+            // 如果peer集群为空，或者这本来就是复制操作，那么就不再复制，防止造成循环复制
             if (peerEurekaNodes == Collections.EMPTY_LIST || isReplication) {
                 return;
             }
-
+            // 向 peer集群中的每一个peer进行同步
             for (final PeerEurekaNode node : peerEurekaNodes.getPeerEurekaNodes()) {
                 // If the url represents this host, do not replicate to yourself.
+                // 判断是否是自己本机的url 是则不进行复制操作
                 if (peerEurekaNodes.isThisMyUrl(node.getServiceUrl())) {
                     continue;
                 }
+                // 根据Action调用不同的同步请求
                 replicateInstanceActionsToPeers(action, appName, id, info, newStatus, node);
             }
         } finally {
@@ -651,6 +670,10 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
         try {
             InstanceInfo infoFromRegistry = null;
             CurrentRequestVersion.set(Version.V2);
+            // 根据不同类型进行同步
+            // 实际会有http调用 并且采用批任务流的方式
+            // 相同服务实例的相同操作将使用相同的任务编号，在进行同步复制的时候根据任务编号合并操作，
+            // 减少同步操作的数量和网络消耗，但是同时也造成同步复制的延时性不满足CAP中的C(强一致性)。
             switch (action) {
                 case Cancel:
                     node.cancel(appName, id);

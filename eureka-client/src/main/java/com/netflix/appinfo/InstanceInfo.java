@@ -50,6 +50,9 @@ import org.slf4j.LoggerFactory;
  * </p>
  *
  * @author Karthik Ranganathan, Greg Kim
+ *
+ * 封装将被发送到 Eureka Server 进行服务注册的服务实例元数据。 它在 EurekaServer
+ * 的注册表中代表一个服务实例，其他服务实例可以通过 InstanceInfo了解该服务实例的相关信息从而发起服务请求
  */
 @ProvidedBy(EurekaConfigBasedInstanceInfoProvider.class)
 @Serializer("com.netflix.discovery.converters.EntityBodyConverter")
@@ -89,6 +92,7 @@ public class InstanceInfo {
     public static final int DEFAULT_COUNTRY_ID = 1; // US
 
     // The (fixed) instanceId for this instanceInfo. This should be unique within the scope of the appName.
+    // 唯一标识一个服务
     private volatile String instanceId;
 
     private volatile String appName;
@@ -1332,8 +1336,11 @@ public class InstanceInfo {
     }
 
     public enum ActionType {
+        // 添加到eureka server
         ADDED, // Added in the discovery server
+        // 信息发生变化
         MODIFIED, // Changed in the discovery server
+        // 被从 Eureka Server 中剔除
         DELETED
         // Deleted from the discovery server
     }

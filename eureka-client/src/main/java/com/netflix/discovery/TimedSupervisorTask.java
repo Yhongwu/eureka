@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
  * A supervisor task that schedules subtasks while enforce a timeout.
  * Wrapped subtasks must be thread safe.
  *
+ * 继承与jdk的TimerTask
+ *
  * @author David Qiang Liu
  */
 public class TimedSupervisorTask extends TimerTask {
@@ -59,20 +61,27 @@ public class TimedSupervisorTask extends TimerTask {
     public void run() {
         Future<?> future = null;
         try {
+            // 提交执行任务 task才是真正的心跳或者刷新缓存的任务逻辑
             future = executor.submit(task);
             threadPoolLevelGauge.set((long) executor.getActiveCount());
+            // future获取结果 阻塞
             future.get(timeoutMillis, TimeUnit.MILLISECONDS);  // block until done or timeout
+            // 设置下次执行间隔 如果执行成功 把时间重新设置为默认的超时时间
             delay.set(timeoutMillis);
             threadPoolLevelGauge.set((long) executor.getActiveCount());
         } catch (TimeoutException e) {
             logger.warn("task supervisor timed out", e);
+            // 如果超时 记录超时次数
             timeoutCounter.increment();
-
+            // 超时时间翻倍 因为如果一开始超时 后面每次还是同样时间30s 很可能也会超时 这样每次都会超时
             long currentDelay = delay.get();
+            // 与阈值相比取最小
             long newDelay = Math.min(maxDelay, currentDelay * 2);
+            // cas 设置超时时间
             delay.compareAndSet(currentDelay, newDelay);
 
         } catch (RejectedExecutionException e) {
+            // 任务被拒绝 统计拒绝次数
             if (executor.isShutdown() || scheduler.isShutdown()) {
                 logger.warn("task supervisor shutting down, reject the task", e);
             } else {
@@ -86,14 +95,17 @@ public class TimedSupervisorTask extends TimerTask {
             } else {
                 logger.warn("task supervisor threw an exception", e);
             }
-
+            // 统计异常次数
             throwableCounter.increment();
         } finally {
+            // 取消未结束的任务
             if (future != null) {
                 future.cancel(true);
             }
 
             if (!scheduler.isShutdown()) {
+                // 如果定时任务服务未关闭，定义下一次任务
+                // 不断循环
                 scheduler.schedule(this, delay.get(), TimeUnit.MILLISECONDS);
             }
         }

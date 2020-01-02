@@ -29,10 +29,14 @@ import com.netflix.eureka.registry.AbstractInstanceRegistry;
  * {@link T} and {@link LeaseManager}.
  *
  * @author Karthik Ranganathan, Greg Kim
+ *
+ * 服务实例的租约
+ * T一般为InstanceInfo 持有InstanceInfo实例
  */
 public class Lease<T> {
 
     enum Action {
+        // 注册、下线、续约
         Register, Cancel, Renew
     };
 
@@ -44,6 +48,7 @@ public class Lease<T> {
     private long serviceUpTimestamp;
     // Make it volatile so that the expiration task would see this quicker
     private volatile long lastUpdateTimestamp;
+    // 租约时长 默认90s
     private long duration;
 
     public Lease(T r, int durationInSecs) {

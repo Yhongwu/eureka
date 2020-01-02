@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  * @author Karthik Ranganathan, Greg Kim
- *
+ * 作为应用信息管理器，管理服务实例的信息类 InstanceInfo 和服务实例的配置信息类 EurekaInstanceConfig
  */
 @Singleton
 public class ApplicationInfoManager {

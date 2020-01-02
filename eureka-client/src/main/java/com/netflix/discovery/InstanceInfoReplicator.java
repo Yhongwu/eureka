@@ -85,16 +85,19 @@ class InstanceInfoReplicator implements Runnable {
     }
 
     public boolean onDemandUpdate() {
+        // 控制流量，当超过限制时，不能进行按需更新
         if (rateLimiter.acquire(burstSize, allowedRatePerMinute)) {
             if (!scheduler.isShutdown()) {
                 scheduler.submit(new Runnable() {
                     @Override
                     public void run() {
+
                         logger.debug("Executing on-demand update of local InstanceInfo");
     
                         Future latestPeriodic = scheduledPeriodicRef.get();
                         if (latestPeriodic != null && !latestPeriodic.isDone()) {
                             logger.debug("Canceling the latest scheduled update, it will be rescheduled at the end of on demand update");
+                            // 取消上次run任务
                             latestPeriodic.cancel(false);
                         }
     
@@ -114,16 +117,20 @@ class InstanceInfoReplicator implements Runnable {
 
     public void run() {
         try {
+            // 刷新instanceInfo中的服务实例信息
             discoveryClient.refreshInstanceInfo();
-
+            // 如果数据发生更改,则返回数据更新时间
             Long dirtyTimestamp = instanceInfo.isDirtyWithTime();
             if (dirtyTimestamp != null) {
+                // 注册服务实例
                 discoveryClient.register();
+                // 重置更新状态
                 instanceInfo.unsetIsDirty(dirtyTimestamp);
             }
         } catch (Throwable t) {
             logger.warn("There was a problem with the instance info replicator", t);
         } finally {
+            // 执行下一个延时任务
             Future next = scheduler.schedule(this, replicationIntervalSeconds, TimeUnit.SECONDS);
             scheduledPeriodicRef.set(next);
         }

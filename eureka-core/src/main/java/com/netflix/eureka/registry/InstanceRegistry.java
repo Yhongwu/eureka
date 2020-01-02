@@ -14,6 +14,7 @@ import java.util.Map;
 
 /**
  * @author Tomasz Bak
+ * Eureka Server 注册表的最核心接口，其职责是在内存中管理注册到 Eureka Server 中的服务实例信息 。
  */
 public interface InstanceRegistry extends LeaseManager<InstanceInfo>, LookupService<String> {
 

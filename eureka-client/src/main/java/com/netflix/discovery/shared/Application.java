@@ -48,6 +48,7 @@ import com.thoughtworks.xstream.annotations.XStreamOmitField;
  * application.
  *
  * @author Karthik Ranganathan
+ * Application 中对 InstanceInfo 的操作都是同步操作
  *
  */
 @Serializer("com.netflix.discovery.converters.EntityBodyConverter")
@@ -64,6 +65,9 @@ public class Application {
                 + shuffledInstances + ", instancesMap=" + instancesMap + "]";
     }
 
+    /**
+     * 服务名
+     */
     private String name;
 
     @XStreamOmitField
@@ -73,7 +77,9 @@ public class Application {
     private final Set<InstanceInfo> instances;
 
     private final AtomicReference<List<InstanceInfo>> shuffledInstances;
-
+    /**
+     * 保存注册表信息
+     */
     private final Map<String, InstanceInfo> instancesMap;
 
     public Application() {
@@ -105,6 +111,7 @@ public class Application {
      */
     public void addInstance(InstanceInfo i) {
         instancesMap.put(i.getId(), i);
+        // 同步操作
         synchronized (instances) {
             instances.remove(i);
             instances.add(i);
